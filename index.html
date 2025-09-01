@@ -648,7 +648,7 @@
 
         function updateStats() {
             const totalPaid = Object.values(realPayments).reduce((sum, payment) => sum + payment.amount, 0);
-            const totalInitial = 5782;
+            const totalInitial = 5826;
             const totalCurrent = currentBalances.bbva + currentBalances.cmr + currentBalances.bcp;
             const progress = ((totalInitial - totalCurrent) / totalInitial) * 100;
             
