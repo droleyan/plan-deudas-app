@@ -357,6 +357,8 @@
             .btn-group { flex-direction: column; }
         }
     </style>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
 <body>
@@ -470,6 +472,28 @@
     </div>
 
     <script>
+        <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCEBPo0pqfBKbEcsi1esVRVEGo2RhZvk0k",
+    authDomain: "proyecto-deudas-c2c5f.firebaseapp.com",
+    projectId: "proyecto-deudas-c2c5f",
+    storageBucket: "proyecto-deudas-c2c5f.firebasestorage.app",
+    messagingSenderId: "952862457135",
+    appId: "1:952862457135:web:24e436a2add1f9e73475da"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
+
+
+        
         // Datos del plan original
         const originalPlan = [
             { period: "Sep Q1 (05/09)", income: 1000, expenses: 500, bbva: 373, cmr: 200, bcp: 0, type: "quinzena" },
@@ -505,14 +529,7 @@
             }
         }
 
-        function saveToLocalStorage() {
-            try {
-                localStorage.setItem('alejandro_debt_payments', JSON.stringify(realPayments));
-                showAlert('💾 Datos guardados correctamente', 'success');
-            } catch (e) {
-                showAlert('⚠️ No se pudo guardar (funciona solo en GitHub)', 'warning');
-            }
-        }
+       
 
         function populatePeriodDropdown() {
             const select = document.getElementById('paymentPeriod');
@@ -570,8 +587,16 @@
             document.getElementById('paymentBank').value = '';
             document.getElementById('paymentAmount').value = '';
 
-            // Guardar automáticamente
-            saveToLocalStorage();
+            // Guardar el pago en una colección llamada 'payments'
+await db.collection("payments").add(paymentData);
+            
+// Si el guardado es exitoso, recalcula y actualiza la interfaz
+realPayments = {}; // Limpia los pagos locales para cargarlos de nuevo
+await loadPaymentsFromFirebase();
+updateTable();
+updateStats();
+updateChart();
+showPaymentHistory();
         }
 
         function recalculateBalances() {
@@ -909,15 +934,18 @@
         }
 
         // Inicializar la aplicación
-        document.addEventListener('DOMContentLoaded', function() {
-            loadFromLocalStorage();
-            populatePeriodDropdown();
-            updateTable();
-            updateStats();
-            updateChart();
-            updateDebtCards();
-            showPaymentHistory();
-        });
+document.addEventListener('DOMContentLoaded', async function() {
+    // Carga los pagos desde Firebase
+    await loadPaymentsFromFirebase();
+    
+    // El resto del código se mantiene igual
+    populatePeriodDropdown();
+    updateTable();
+    updateStats();
+    updateChart();
+    updateDebtCards();
+    showPaymentHistory();
+});
     </script>
 </body>
 </html>
