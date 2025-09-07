@@ -1,72 +1,73 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AntiDeudas</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AntiDeudas - Prueba Firebase</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f3f4f6;
-    }
-    h1, h2 {
-      text-align: center;
-    }
-    form {
-      margin-bottom: 20px;
-      text-align: center;
-    }
-    input, button {
-      padding: 8px;
-      margin: 5px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-    }
-    th, td {
-      padding: 10px;
-      border: 1px solid #ddd;
-      text-align: center;
-    }
-    th {
-      background: #2563eb;
-      color: white;
-    }
-    tr:nth-child(even) {
-      background: #f9fafb;
-    }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto; margin:18px; background:#f4f6f8;}
+    .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.06); max-width:920px;margin:12px auto;}
+    h1{margin:0 0 8px}
+    form{display:flex;gap:8px;flex-wrap:wrap}
+    input, select, button{padding:8px;border-radius:6px;border:1px solid #dfe6ee}
+    button{cursor:pointer;background:#2563eb;color:#fff;border:none}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px;border-bottom:1px solid #eef2f6;text-align:left}
+    .paid{opacity:0.6;text-decoration:line-through}
+    .status{position:fixed;right:12px;top:12px;padding:8px 12px;border-radius:20px;font-weight:600}
+    .connected{background:#dff6e9;color:#087a3b}
+    .error{background:#ffe9e9;color:#b11a1a}
+    .btn-small{padding:6px 8px;border-radius:6px;background:#e2e8f0;border:none;cursor:pointer}
+    .btn-del{background:#f87171;color:#fff}
   </style>
 </head>
 <body>
-  <h1>AntiDeudas 💸</h1>
-  <h2>Registro de Deudas</h2>
+  <div id="firebaseStatus" class="status">🔄 Conectando...</div>
 
-  <form id="formDeuda">
-    <input type="text" id="banco" placeholder="Banco" required>
-    <input type="number" id="monto" placeholder="Monto (S/)" required>
-    <button type="submit">Agregar</button>
-  </form>
+  <div class="card">
+    <h1>AntiDeudas — Prueba Firebase</h1>
+    <p>Agrega un pago y marca como <strong>pagado</strong>. Los cambios se reflejan en tiempo real.</p>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Banco</th>
-        <th>Monto (S/)</th>
-        <th>Fecha</th>
-      </tr>
-    </thead>
-    <tbody id="tablaDeudas"></tbody>
-  </table>
+    <form id="formPayment">
+      <select id="period" required>
+        <option value="">Período (selecciona)</option>
+        <option>Sep Q1 (05/09/2025)</option>
+        <option>Sep Q2 (15/09/2025)</option>
+        <option>Oct Q1 (05/10/2025)</option>
+        <option>Oct Q2 (15/10/2025)</option>
+      </select>
 
+      <select id="bank" required>
+        <option value="">Banco</option>
+        <option value="bbva">BBVA</option>
+        <option value="cmr">CMR Falabella</option>
+        <option value="bcp">BCP Visa</option>
+      </select>
+
+      <input id="amount" type="number" min="0" step="0.01" placeholder="Monto (S/)" required />
+      <button type="submit">➕ Agregar</button>
+      <button id="clearBtn" type="button" style="background:#6b7280;margin-left:8px">Limpiar</button>
+    </form>
+
+    <div style="margin-top:8px">Total guardado en la nube: <strong id="totalCount">0</strong></div>
+
+    <table>
+      <thead>
+        <tr><th>Pagado</th><th>Período</th><th>Banco</th><th>Monto (S/)</th><th>Fecha</th><th>Acciones</th></tr>
+      </thead>
+      <tbody id="paymentsBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Firebase v9 modular CDN -->
   <script type="module">
-    // Importar Firebase desde el CDN oficial
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+    import {
+      getFirestore, collection, addDoc, query, orderBy,
+      onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
 
-    // Configuración de tu proyecto
+    // --- TU CONFIG (la que me pasaste) ---
     const firebaseConfig = {
       apiKey: "AIzaSyCEBPo0pqfBKbEcsi1esVRVEGo2RhZvk0k",
       authDomain: "proyecto-deudas-c2c5f.firebaseapp.com",
@@ -77,54 +78,126 @@
     };
 
     // Inicializar Firebase
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    let app, db;
+    try {
+      app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      setStatus('✅ Firebase conectado', true);
+    } catch (e) {
+      console.error('Error init Firebase', e);
+      setStatus('❌ Error Firebase', false);
+      throw e;
+    }
 
-    const form = document.getElementById("formDeuda");
-    const tabla = document.getElementById("tablaDeudas");
+    // Elementos DOM
+    const form = document.getElementById('formPayment');
+    const paymentsBody = document.getElementById('paymentsBody');
+    const totalCountEl = document.getElementById('totalCount');
+    const clearBtn = document.getElementById('clearBtn');
 
-    // Guardar en Firestore
-    form.addEventListener("submit", async (e) => {
+    // Colección
+    const paymentsCol = collection(db, 'payments');
+    const q = query(paymentsCol, orderBy('timestamp', 'desc'));
+
+    // LISTENER en tiempo real
+    onSnapshot(q, (snapshot) => {
+      renderPayments(snapshot.docs);
+      totalCountEl.innerText = snapshot.size;
+      setStatus('🟢 Conexión OK (en tiempo real)', true);
+    }, (err) => {
+      console.error('onSnapshot error', err);
+      setStatus('❌ Error lectura', false);
+    });
+
+    // Agregar nuevo pago
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const banco = document.getElementById("banco").value;
-      const monto = parseFloat(document.getElementById("monto").value);
+      const period = document.getElementById('period').value;
+      const bank = document.getElementById('bank').value;
+      const amount = parseFloat(document.getElementById('amount').value || 0);
+
+      if (!period || !bank || !amount) {
+        alert('Completa todos los campos');
+        return;
+      }
 
       try {
-        await addDoc(collection(db, "deudas"), {
-          banco: banco,
-          monto: monto,
-          fecha: new Date().toISOString()
+        await addDoc(paymentsCol, {
+          period,
+          bank,
+          amount,
+          paid: false,
+          timestamp: serverTimestamp()
         });
-        console.log("Deuda guardada en Firebase!");
         form.reset();
-        cargarDeudas(); // refrescar tabla
       } catch (err) {
-        console.error("Error al guardar:", err);
+        console.error('Error guardando', err);
+        alert('Error guardando en Firebase: ' + err.message);
       }
     });
 
-    // Leer de Firestore y mostrar en tabla
-    async function cargarDeudas() {
-      tabla.innerHTML = "";
-      const q = query(collection(db, "deudas"), orderBy("fecha", "desc"));
-      const querySnapshot = await getDocs(q);
+    // Limpiar inputs
+    clearBtn.addEventListener('click', () => form.reset());
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const fila = document.createElement("tr");
-        const fecha = new Date(data.fecha).toLocaleString("es-PE");
+    // Render función
+    function renderPayments(docs) {
+      paymentsBody.innerHTML = '';
+      docs.forEach(docSnap => {
+        const id = docSnap.id;
+        const d = docSnap.data();
+        const fecha = d.timestamp ? (d.timestamp.toDate ? d.timestamp.toDate().toLocaleString('es-PE') : new Date(d.timestamp.seconds*1000).toLocaleString('es-PE')) : '-';
+        const tr = document.createElement('tr');
+        tr.className = d.paid ? 'paid' : '';
 
-        fila.innerHTML = `
-          <td>${data.banco}</td>
-          <td>S/ ${data.monto.toFixed(2)}</td>
+        tr.innerHTML = `
+          <td style="width:70px;text-align:center">
+            <input type="checkbox" data-id="${id}" ${d.paid ? 'checked' : ''} />
+          </td>
+          <td>${escapeHtml(d.period || '')}</td>
+          <td>${escapeHtml((d.bank || '').toUpperCase())}</td>
+          <td>S/ ${Number(d.amount || 0).toFixed(2)}</td>
           <td>${fecha}</td>
+          <td>
+            <button class="btn-small" data-del="${id}">Eliminar</button>
+          </td>
         `;
-        tabla.appendChild(fila);
+        paymentsBody.appendChild(tr);
+
+        // checkbox listener
+        tr.querySelector('input[type="checkbox"]').addEventListener('change', async (ev) => {
+          const checked = ev.target.checked;
+          try {
+            await updateDoc(doc(db, 'payments', id), { paid: checked });
+          } catch (err) {
+            console.error('Error updating paid', err);
+            alert('Error actualizando: ' + err.message);
+          }
+        });
+
+        // delete listener
+        tr.querySelector('button[data-del]').addEventListener('click', async () => {
+          if (!confirm('¿Eliminar registro?')) return;
+          try {
+            await deleteDoc(doc(db, 'payments', id));
+          } catch (err) {
+            console.error('Error deleting', err);
+            alert('Error eliminando: ' + err.message);
+          }
+        });
       });
     }
 
-    // Al cargar la página
-    cargarDeudas();
+    // Escapa básico
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // Estado visual
+    function setStatus(msg, ok) {
+      const el = document.getElementById('firebaseStatus');
+      el.textContent = msg;
+      el.className = 'status ' + (ok ? 'connected' : 'error');
+    }
   </script>
 </body>
 </html>
